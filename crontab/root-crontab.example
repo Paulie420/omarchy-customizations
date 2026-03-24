@@ -1,0 +1,12 @@
+# Root crontab for PiVPN watchdog
+# Install with: sudo crontab -e
+# Then paste the line below (replace YOUR_USERNAME with your actual username):
+#
+# The watchdog checks every minute whether tun0 exists when the OpenVPN
+# service is active. If tun0 is missing, it restarts the service.
+# This catches the rare case where the interface drops but the service doesn't.
+#
+# OpenVPN's built-in ping-restart 60 handles dead connections;
+# this script only handles the tun0-vanishes edge case.
+
+* * * * * /home/YOUR_USERNAME/.local/bin/pivpn-watchdog.sh

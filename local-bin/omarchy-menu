@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Wrapper: delegates to the custom menu shim in ~/.config/omarchy/bin/
+# Place this at ~/.local/bin/omarchy-menu (overrides the upstream command)
+exec "$HOME/.config/omarchy/bin/omarchy-menu-nas.sh" "$@"

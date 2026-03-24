@@ -1,0 +1,14 @@
+# Never commit actual OpenVPN configs with real keys/certs
+/etc/
+*.askpass
+*.ovpn
+
+# State files
+*.bak
+*.bak.*
+/omarchy-config/state/
+
+# Editor/OS artifacts
+.DS_Store
+*~
+*.swp
