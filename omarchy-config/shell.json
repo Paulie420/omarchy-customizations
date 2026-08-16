@@ -57,8 +57,7 @@
               "interface": "pivpn",
               "color": "#5fa8e8",
               "connectCommand": "$HOME/.local/bin/pivpn-connect.sh",
-              "disconnectCommand": "$HOME/.local/bin/pivpn-disconnect.sh",
-              "reachabilityHost": "10.0.0.118"
+              "disconnectCommand": "$HOME/.local/bin/pivpn-disconnect.sh"
             }
           ],
           "pia": {
@@ -79,7 +78,7 @@
       ]
     },
     "position": "top",
-    "transparent": true
+    "transparent": false
   },
   "idle": {
     "lock": 900,

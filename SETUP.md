@@ -153,9 +153,13 @@ connect/disconnect commands at the wrapper scripts so the PIA interlock runs:
   "pia": { "enabled": true, "label": "PIA", "color": "#6fcf82" },
   "wireguard": [{ "label": "PiVPN", "interface": "pivpn", "color": "#5fa8e8",
     "connectCommand": "$HOME/.local/bin/pivpn-connect.sh",
-    "disconnectCommand": "$HOME/.local/bin/pivpn-disconnect.sh",
-    "reachabilityHost": "10.0.0.118" }] }
+    "disconnectCommand": "$HOME/.local/bin/pivpn-disconnect.sh" }] }
 ```
+
+The plugin also supports `reachabilityHost` — it pings something behind the
+tunnel and reports it in the panel. Deliberately not set here: `vpn-nas-status.sh`
+already answers that question, and it put an internal IP on screen in every
+screenshot of the panel.
 
 `color` is what makes the bar icon say *which* VPN is up: PIA green, PiVPN
 blue, and the glyph splits in half when both are connected. Omit it and the
