@@ -12,7 +12,7 @@
           "formatAlt": "d MMMM 'W'ww yyyy",
           "id": "omarchy.clock",
           "lifeExpectancy": 85,
-          "verticalFormat": "h\n\u2014\nmm"
+          "verticalFormat": "h\n—\nmm"
         },
         {
           "id": "omarchy.keyboard-layout"
@@ -37,6 +37,9 @@
           "id": "omarchy.tray"
         },
         {
+          "id": "io.github.ilyazar.syncthing"
+        },
+        {
           "id": "omarchy.agents"
         },
         {
@@ -52,6 +55,7 @@
               "enabled": true,
               "label": "PiVPN",
               "interface": "pivpn",
+              "color": "#5fa8e8",
               "connectCommand": "$HOME/.local/bin/pivpn-connect.sh",
               "disconnectCommand": "$HOME/.local/bin/pivpn-disconnect.sh",
               "reachabilityHost": "10.0.0.118"
@@ -59,7 +63,8 @@
           ],
           "pia": {
             "enabled": true,
-            "label": "PIA"
+            "label": "PIA",
+            "color": "#6fcf82"
           }
         },
         {
@@ -74,12 +79,16 @@
       ]
     },
     "position": "top",
-    "transparent": false
+    "transparent": true
   },
   "idle": {
     "lock": 900,
     "screensaver": 600
   },
-  "plugins": [],
+  "plugins": [
+    {
+      "id": "vbrosseau.alttab"
+    }
+  ],
   "version": 1
 }

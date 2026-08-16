@@ -150,12 +150,16 @@ connect/disconnect commands at the wrapper scripts so the PIA interlock runs:
 
 ```jsonc
 { "id": "paulie420.vpn",
-  "pia": { "enabled": true, "label": "PIA" },
-  "wireguard": [{ "label": "PiVPN", "interface": "pivpn",
+  "pia": { "enabled": true, "label": "PIA", "color": "#6fcf82" },
+  "wireguard": [{ "label": "PiVPN", "interface": "pivpn", "color": "#5fa8e8",
     "connectCommand": "$HOME/.local/bin/pivpn-connect.sh",
     "disconnectCommand": "$HOME/.local/bin/pivpn-disconnect.sh",
     "reachabilityHost": "10.0.0.118" }] }
 ```
+
+`color` is what makes the bar icon say *which* VPN is up: PIA green, PiVPN
+blue, and the glyph splits in half when both are connected. Omit it and the
+plugin assigns colours automatically.
 
 A reference copy of the whole file is in `omarchy-config/shell.json`.
 

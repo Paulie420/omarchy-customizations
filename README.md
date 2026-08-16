@@ -3,7 +3,7 @@
 A collection of scripts and configuration files extending [Omarchy](https://omarchy.org/) — a beautiful, opinionated Arch Linux distribution built on Hyprland.
 
 These customizations add:
-- **Dual VPN support in the bar** — PIA and a self-hosted PiVPN (WireGuard). Now lives in its own published plugin: [Paulie420/omarchy-vpn](https://github.com/Paulie420/omarchy-vpn)
+- **Dual VPN support in the bar** — PIA and a self-hosted PiVPN (WireGuard), each with its own colour in the bar icon so you can see which one is up at a glance. Lives in its own published plugin: [Paulie420/omarchy-vpn](https://github.com/Paulie420/omarchy-vpn)
 - **NAS mount integration** — Smart NFS mounting via local network or VPN fallback
 - **Custom Omarchy menu** — Extends the built-in menu with a "Custom" section without modifying upstream files
 - **Shutdown/startup sounds** — Windows-era sound themes (2000/XP/Vista/11) on boot and shutdown
