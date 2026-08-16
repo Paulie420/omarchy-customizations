@@ -1,7 +1,4 @@
 #!/bin/bash
-# Generate and open the Hyprland keybind cheat sheet as a PDF.
-# Requires: hypr-cheatgen.py, python-reportlab, zathura or evince
-
 set -euo pipefail
 
 export PATH="$HOME/.config/omarchy/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH"
@@ -17,7 +14,7 @@ mkdir -p "$CHEAT_DIR"
 "$CHEATGEN" --format ascii --width 80 --out "$TXT" \
   --pdf "$PDF" --pdf-font-size 15 --pdf-line-height 17
 
-# Open PDF viewer
+# Open viewer (we'll make it fullscreen via window rules)
 if command -v zathura >/dev/null 2>&1; then
   exec zathura "$PDF"
 elif command -v evince >/dev/null 2>&1; then
@@ -25,3 +22,4 @@ elif command -v evince >/dev/null 2>&1; then
 else
   exec xdg-open "$PDF"
 fi
+

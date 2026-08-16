@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Play a startup sound on Hyprland login.
-# Add to ~/.config/hypr/autostart.conf:
-#   exec-once = ~/.config/omarchy/bin/hypr-startup-sound.sh
-
 set -euo pipefail
 
 SOUND_DIR="$HOME/.config/omarchy/sounds"
@@ -45,3 +41,4 @@ if [[ -f "$SOUND_STARTUP" ]]; then
 elif [[ -f "$FALLBACK_STARTUP" ]]; then
   play_sound "$FALLBACK_STARTUP"
 fi
+

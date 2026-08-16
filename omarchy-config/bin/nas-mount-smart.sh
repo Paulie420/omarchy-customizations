@@ -1,43 +1,40 @@
 #!/usr/bin/env bash
-# Smart NAS mounter.
-# Strategy:
-#   1. Try to mount NFS shares directly (local network path)
-#   2. If local mount fails, connect PiVPN and retry over the tunnel
-#
-# Edit the variables below for your NAS configuration before use.
-
 set -euo pipefail
+
+# omarchy-window-title -- name the terminal window so these popups are identifiable
+printf '\033]0;Omarchy \u00b7 NAS Mount\007'
 
 echo "=== nas-mount-smart: $(date) ==="
 
-# ── CONFIGURE THESE ──────────────────────────────────────────────────────────
-NAS_IP="YOUR_NAS_IP"               # e.g., 192.168.1.100
-EXPORT_BASE="/YOUR_NAS_EXPORT_BASE" # NFS export root path on the NAS, e.g. /mnt/Data
+NAS_IP="10.0.0.118"
+EXPORT_BASE="/mnt/SpeakerOffice"
 
-# Format: "ExportSubdir:/local/mountpoint"
+# Mounts to create
 MOUNTS=(
-  "Share1:/mnt/Share1"
-  "Share2:/mnt/Share2"
-  "Share3:/mnt/Share3"
+  "Backup4TB:/mnt/Backup4TB"
+  "Backup6TB:/mnt/Backup6TB"
+  "Beers4TB:/mnt/Beers4TB"
+  "newBackupXTB:/mnt/newBackupXTB"
 )
-# ─────────────────────────────────────────────────────────────────────────────
 
+# Scripts you already have
 PIVPN_CONNECT="$HOME/.local/bin/pivpn-connect.sh"
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# ---- helpers -------------------------------------------------------------
 
 log(){ echo "[nas] $*"; }
 
 have(){ command -v "$1" >/dev/null 2>&1; }
 
 is_mounted() {
-  # Safe mount check (won't hang on dead NFS)
+  # SAFE mount check (won’t hang on dead NFS)
   local target="$1"
   awk -v t="$target" '$5==t {found=1} END{exit(found?0:1)}' /proc/self/mountinfo
 }
 
 nas_port_open() {
-  # Test NFS port (2049) rather than relying on ping alone
+  # Don’t rely only on ping; test NFS port quickly.
+  # 2049 is NFSv4. This doesn’t “touch” the mountpoints.
   if have nc; then
     nc -z -w1 "$NAS_IP" 2049 >/dev/null 2>&1
   else
@@ -46,6 +43,7 @@ nas_port_open() {
 }
 
 nas_reachable() {
+  # Use ping OR NFS port. Ping might be blocked; port check is better.
   ping -c 1 -W 1 "$NAS_IP" >/dev/null 2>&1 || nas_port_open
 }
 
@@ -66,7 +64,8 @@ mount_one() {
   local src="${NAS_IP}:${EXPORT_BASE}/${share}"
   log "Mounting: $src -> $target"
 
-  # Timeout so we never hang forever if routing is broken
+  # IMPORTANT: timeout so we never hang forever if routing is broken
+  # - Use a longer timeout if your network is slow.
   if timeout 8 sudo mount "$src" "$target"; then
     return 0
   else
@@ -103,7 +102,7 @@ wait_for_nas() {
   return 1
 }
 
-# ── main ─────────────────────────────────────────────────────────────────────
+# ---- main ---------------------------------------------------------------
 
 # 1) Try LOCAL mount path FIRST — no VPN changes
 if nas_reachable; then
@@ -124,20 +123,35 @@ log "Local mount failed -> falling back to PiVPN path..."
 log "Connecting PiVPN..."
 "$PIVPN_CONNECT" || true
 
-log "Waiting for openvpn-client@pivpn to be active..."
-for _ in $(seq 1 15); do
-  systemctl is-active --quiet openvpn-client@pivpn && break
+log "Waiting for wg-quick@pivpn and a real handshake..."
+# wg-quick is Type=oneshot: it reports "active" the moment the interface and
+# routes exist, WITHOUT ever contacting the peer. So waiting on the unit alone
+# would happily proceed against a dead tunnel. rx_bytes only becomes non-zero
+# once the server has actually answered a handshake.
+rx() { cat /sys/class/net/pivpn/statistics/rx_bytes 2>/dev/null || echo 0; }
+
+for _ in $(seq 1 20); do
+  if systemctl is-active --quiet wg-quick@pivpn && [ "$(rx)" -gt 0 ]; then
+    break
+  fi
   sleep 1
 done
 
-if ! systemctl is-active --quiet openvpn-client@pivpn; then
-  log "ERROR: PiVPN did not become active."
+if ! systemctl is-active --quiet wg-quick@pivpn; then
+  log "ERROR: wg-quick@pivpn did not start."
   notify-send "NAS" "PiVPN failed ❌"
   exit 1
 fi
 
+if [ "$(rx)" -eq 0 ]; then
+  log "ERROR: pivpn interface is up but the peer never answered (no handshake)."
+  log "       Check the PiVPN VM is running and UDP 51820 is forwarded."
+  notify-send "NAS" "PiVPN: no handshake ❌"
+  exit 1
+fi
+
 if ! wait_for_nas; then
-  log "ERROR: NAS still not reachable over PiVPN (check routes/NAS IP/VPN config)"
+  log "ERROR: NAS still not reachable over PiVPN (routes/NAS IP/VPN config)"
   notify-send "NAS" "NAS unreachable over PiVPN ❌"
   exit 1
 fi
@@ -150,3 +164,4 @@ fi
 
 notify-send "NAS" "Mount failed ❌"
 exit 1
+

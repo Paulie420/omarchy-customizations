@@ -1,34 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SERVICE="openvpn-client@pivpn"
-PIACTL="/opt/piavpn/bin/piactl"
-STATE_FILE="/tmp/pivpn-pia-was-connected"
+# omarchy-window-title -- name the terminal window so these popups are identifiable
+printf '\033]0;Omarchy \u00b7 PiVPN Disconnect\007'
 
-log() {
-  # Only print if stdout is a terminal
-  if [[ -t 1 ]]; then
-    echo "$@"
-  fi
-}
+INTERFACE="pivpn"
+STATE_FILE="/tmp/pivpn-pia-was-active"
 
-log "[PiVPN] Disconnecting…"
+log() { if [[ -t 1 ]]; then echo "$@"; fi }
 
-# 1) Stop PiVPN via systemd (polkit will handle auth if needed)
-if systemctl is-active --quiet "$SERVICE"; then
-  if ! systemctl stop "$SERVICE"; then
-    log "[PiVPN] ERROR: failed to stop $SERVICE."
-    exit 1
-  fi
+if systemctl is-active --quiet "wg-quick@${INTERFACE}.service"; then
+    log "[PiVPN] Disconnecting..."
+    if ! systemctl stop "wg-quick@${INTERFACE}.service"; then
+        log "[PiVPN] ERROR: failed to stop wg-quick@${INTERFACE}."
+        exit 1
+    fi
+    log "[PiVPN] Disconnected."
 else
-  log "[PiVPN] $SERVICE is not active."
+    log "[PiVPN] Not connected."
 fi
 
-log "[PiVPN] Disconnected."
-
-# 2) If PIA was previously connected before PiVPN, reconnect it now
-if [[ -x "$PIACTL" && -f "$STATE_FILE" ]]; then
-  log "[PiVPN] PIA was connected before PiVPN. Reconnecting PIA…"
-  "$PIACTL" connect || true
-  rm -f "$STATE_FILE"
+# Restore PIA if it was active before Pi-VPN connected
+if [[ "$(cat "$STATE_FILE" 2>/dev/null)" == "true" ]]; then
+    log "[PiVPN] Restoring PIA VPN..."
+    piactl connect || true
+    rm -f "$STATE_FILE"
 fi

@@ -1,15 +1,8 @@
 #!/usr/bin/env bash
-# Interactive picker to select a Windows-era sound theme.
-# Copies the selected theme's files to startup.mp3 and shutdown.mp3.
-# The omarchy-launch-walker dmenu UI is used for selection.
-#
-# Sound files must be placed in ~/.config/omarchy/sounds/:
-#   win2000startup.mp3 / win2000shutdown.mp3
-#   winxpstartup.mp3   / winxpshutdown.mp3
-#   winvistastartup.mp3 / winvistashutdown.mp3
-#   win11startup.mp3   / win11shutdown.mp3
-
 set -euo pipefail
+
+# omarchy-window-title -- name the terminal window so these popups are identifiable
+printf '\033]0;Omarchy \u00b7 Startup Sounds\007'
 
 SOUND_DIR="$HOME/.config/omarchy/sounds"
 STATE_DIR="$HOME/.config/omarchy/state"
@@ -21,9 +14,12 @@ notify() {
 
 mkdir -p "$SOUND_DIR" "$STATE_DIR"
 
-options=$'Windows 2000\nWindows XP\nWindows Vista\nWindows 11'
-
-choice="$(printf '%s\n' "$options" | omarchy-launch-walker --dmenu --width 360 --minheight 1 --maxheight 300 -p "Sound theme…" 2>/dev/null || true)"
+# Quattro removed the `omarchy-launch-walker` wrapper (walker itself is retired),
+# so the old dmenu call failed silently -- `|| true` swallowed it, $choice came
+# back empty, and the script exited without ever showing a picker.
+# `omarchy-menu-select` is Quattro's native, themed replacement.
+choice="$(omarchy-menu-select "Sound theme" \
+  "Windows 2000" "Windows XP" "Windows Vista" "Windows 11" 2>/dev/null || true)"
 [[ -z "${choice:-}" || "$choice" == "CNCLD" ]] && exit 0
 
 case "$choice" in
@@ -72,5 +68,6 @@ echo
 echo "startup.mp3  <- $(basename "$startup_src")"
 echo "shutdown.mp3 <- $(basename "$shutdown_src")"
 echo
-read -n 1 -r -s -p "Press any key to close…"
+[[ -t 0 ]] && read -n 1 -r -s -p "Press any key to close…"
 echo
+

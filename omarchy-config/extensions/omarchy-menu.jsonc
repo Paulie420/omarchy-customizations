@@ -1,0 +1,117 @@
+{
+  // ---------------------------------------------------------------------
+  // paulie420's Custom menu — Omarchy Quattro
+  //
+  // Replaces the pre-Quattro `omarchy-menu-nas.sh` shim, which read the
+  // upstream menu script, rewrote it with a Python regex pass, and executed
+  // the patched copy from /tmp. That approach anchored on upstream internals
+  // (show_main_menu, present_terminal, ...) and silently no-opped whenever
+  // upstream moved. This file is the supported replacement: declarative,
+  // hot-reloading on save, and immune to upstream restructuring.
+  //
+  // Parent is inferred from the dotted id, so "custom.nas.mount" nests under
+  // "custom.nas", which nests under "custom" on the root menu.
+  // ---------------------------------------------------------------------
+
+  "custom": { "icon": "󰠱", "label": "Custom", "description": "NAS, VPN, cheatsheets, sounds, screensaver" },
+
+  "custom.status": {
+    "icon": "󰋼",
+    "label": "VPN & NAS status",
+    "description": "Mounts, VPN state, sound theme, screensaver mode",
+    "action": "omarchy-launch-tui --app-id=org.omarchy.custom-tui $HOME/.config/omarchy/bin/vpn-nas-status.sh"
+  },
+
+  // ---- NAS ------------------------------------------------------------
+  "custom.nas": { "icon": "󰋊", "label": "NAS", "description": "Mount and unmount the SpeakerOffice shares" },
+
+  "custom.nas.mount": {
+    "icon": "󰉋",
+    "label": "Mount NAS (smart)",
+    "description": "Try the LAN first, fall back to PiVPN if away from home",
+    "action": "omarchy-launch-tui --app-id=org.omarchy.custom-tui $HOME/.config/omarchy/bin/nas-mount-smart.sh"
+  },
+  "custom.nas.unmount": {
+    "icon": "󰃢",
+    "label": "Unmount all NAS shares",
+    "description": "Safe unmount, survives a dead NFS server",
+    "action": "omarchy-launch-tui --app-id=org.omarchy.custom-tui $HOME/.config/omarchy/bin/nas-unmount-all.sh"
+  },
+  "custom.nas.open": {
+    "icon": "󰝰",
+    "label": "Open /mnt",
+    "description": "Browse the mounted shares in the file manager",
+    "action": "uwsm-app -- nautilus /mnt"
+  },
+
+  // ---- VPN ------------------------------------------------------------
+  // The bar widget is the primary control; these stay for keyboard-driven
+  // access and because they surface the connect scripts' terminal output.
+  "custom.vpn": { "icon": "󰖂", "label": "VPN", "description": "PIA and PiVPN connect / disconnect" },
+
+  "custom.vpn.pia-connect": {
+    "icon": "󰦝",
+    "label": "PIA connect",
+    "description": "Private Internet Access — general internet privacy",
+    "when": "test -x /opt/piavpn/bin/piactl",
+    "checked": "test \"$(/opt/piavpn/bin/piactl get connectionstate 2>/dev/null)\" = Connected",
+    "action": "/opt/piavpn/bin/piactl connect"
+  },
+  "custom.vpn.pia-disconnect": {
+    "icon": "󰦞",
+    "label": "PIA disconnect",
+    "when": "test -x /opt/piavpn/bin/piactl",
+    "action": "/opt/piavpn/bin/piactl disconnect"
+  },
+  "custom.vpn.pivpn-connect": {
+    "icon": "󰌾",
+    "label": "PiVPN connect",
+    "description": "WireGuard tunnel to the homelab (10.0.0.0/24)",
+    "checked": "test \"$(cat /sys/class/net/pivpn/statistics/rx_bytes 2>/dev/null || echo 0)\" -gt 0",
+    "action": "omarchy-launch-tui --app-id=org.omarchy.custom-tui $HOME/.local/bin/pivpn-connect.sh"
+  },
+  "custom.vpn.pivpn-disconnect": {
+    "icon": "󰌿",
+    "label": "PiVPN disconnect",
+    "action": "omarchy-launch-tui --app-id=org.omarchy.custom-tui $HOME/.local/bin/pivpn-disconnect.sh"
+  },
+
+  // ---- Cheatsheets ----------------------------------------------------
+  "custom.cheats": { "icon": "󰌌", "label": "Keybind cheatsheet", "description": "Generated from your live Hyprland bindings" },
+
+  "custom.cheats.txt": {
+    "icon": "󰈙",
+    "label": "Show binds (text)",
+    "action": "$HOME/.config/omarchy/bin/show-cheatsheet.sh --all"
+  },
+  "custom.cheats.pdf": {
+    "icon": "󰈦",
+    "label": "Show binds (PDF)",
+    "action": "$HOME/.config/omarchy/bin/show-cheatsheet-pdf.sh --all"
+  },
+
+  // ---- Screensaver ----------------------------------------------------
+  // ✓ marks the active profile, read from ~/.config/omarchy/state/screensaver_mode.
+  "custom.screensaver": { "icon": "󰾪", "label": "Screensaver", "description": "Switch between stock and long idle timeouts" },
+
+  "custom.screensaver.stock": {
+    "icon": "󰾪",
+    "label": "Stock timeouts",
+    "checked": "grep -qx stock $HOME/.config/omarchy/state/screensaver_mode",
+    "action": "omarchy-launch-tui --app-id=org.omarchy.custom-tui $HOME/.config/omarchy/bin/screensaver-stock-mode.sh"
+  },
+  "custom.screensaver.long": {
+    "icon": "󰾫",
+    "label": "Long timeouts",
+    "checked": "grep -qx long $HOME/.config/omarchy/state/screensaver_mode",
+    "action": "omarchy-launch-tui --app-id=org.omarchy.custom-tui $HOME/.config/omarchy/bin/screensaver-long-mode.sh"
+  },
+
+  // ---- Sounds ---------------------------------------------------------
+  "custom.sounds": {
+    "icon": "󰓃",
+    "label": "Startup / shutdown sounds",
+    "description": "Pick a Windows-era sound theme",
+    "action": "$HOME/.config/omarchy/bin/change-startup-shutdown-sounds.sh"
+  }
+}

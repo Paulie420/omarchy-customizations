@@ -1,0 +1,85 @@
+{
+  "bar": {
+    "centerAnchor": "omarchy.clock",
+    "layout": {
+      "center": [
+        {
+          "id": "omarchy.indicators"
+        },
+        {
+          "birthYear": 1979,
+          "format": "dddd h:mm AP",
+          "formatAlt": "d MMMM 'W'ww yyyy",
+          "id": "omarchy.clock",
+          "lifeExpectancy": 85,
+          "verticalFormat": "h\n\u2014\nmm"
+        },
+        {
+          "id": "omarchy.keyboard-layout"
+        },
+        {
+          "id": "omarchy.weather"
+        },
+        {
+          "id": "omarchy.system-update"
+        }
+      ],
+      "left": [
+        {
+          "id": "omarchy.menu"
+        },
+        {
+          "id": "omarchy.workspaces"
+        }
+      ],
+      "right": [
+        {
+          "id": "omarchy.tray"
+        },
+        {
+          "id": "omarchy.agents"
+        },
+        {
+          "id": "omarchy.bluetooth"
+        },
+        {
+          "id": "omarchy.network"
+        },
+        {
+          "id": "paulie420.vpn",
+          "wireguard": [
+            {
+              "enabled": true,
+              "label": "PiVPN",
+              "interface": "pivpn",
+              "connectCommand": "$HOME/.local/bin/pivpn-connect.sh",
+              "disconnectCommand": "$HOME/.local/bin/pivpn-disconnect.sh",
+              "reachabilityHost": "10.0.0.118"
+            }
+          ],
+          "pia": {
+            "enabled": true,
+            "label": "PIA"
+          }
+        },
+        {
+          "id": "omarchy.audio"
+        },
+        {
+          "id": "omarchy.monitor"
+        },
+        {
+          "id": "omarchy.power"
+        }
+      ]
+    },
+    "position": "top",
+    "transparent": false
+  },
+  "idle": {
+    "lock": 900,
+    "screensaver": 600
+  },
+  "plugins": [],
+  "version": 1
+}

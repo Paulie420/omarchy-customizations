@@ -7,7 +7,7 @@ Step-by-step instructions for installing these customizations on a fresh Omarchy
 ## 1. Install Prerequisites
 
 ```bash
-sudo pacman -S openvpn nfs-utils jq rofi mpv python-reportlab fastfetch zathura libnotify
+sudo pacman -S wireguard-tools nfs-utils jq rofi mpv python-reportlab fastfetch zathura libnotify
 ```
 
 Install PIA via the AUR (provides `piactl` at `/opt/piavpn/bin/piactl`):
@@ -17,56 +17,81 @@ omarchy-pkg-aur-add piavpn-bin
 ```
 
 > `piavpn-bin` is the [AUR package](https://aur.archlinux.org/packages/piavpn-bin) for the official PIA Linux client.
-> After install, launch PIA once and log in before the waybar scripts will work.
+# Waybar was retired by Omarchy Quattro. The bar is now omarchy-shell, and the
+# VPN widget installs as a plugin:
+#   omarchy plugin add https://github.com/Paulie420/omarchy-vpn.git --enable
 
 ---
 
-## 2. OpenVPN / PiVPN Setup
+## 2. WireGuard / PiVPN Setup
 
-### 2a. Create the client config
+> Migrated from OpenVPN in May 2026. OpenVPN dropped every 5–6 minutes from remote
+> networks because its sessions expire when NAT tables time out; WireGuard is
+> stateless and reconnects sub-second. The legacy `openvpn/pivpn.conf.template`
+> remains in this repo for reference only.
+
+### 2a. Generate the client on the server
+
+On the PiVPN server, `pivpn -a` creates a client and prints its config. Copy that
+to the laptop as `/etc/wireguard/pivpn.conf`:
 
 ```bash
-sudo mkdir -p /etc/openvpn/client
-sudo cp openvpn/pivpn.conf.template /etc/openvpn/client/pivpn.conf
+sudo install -m 600 /dev/stdin /etc/wireguard/pivpn.conf <<'EOF'
+[Interface]
+PrivateKey = <client private key>
+Address = 10.138.26.2/24,fd11:5ee:bad:c0de::a8a:1a02/64
+
+[Peer]
+PublicKey = <server public key>
+PresharedKey = <preshared key>
+Endpoint = <home-public-ip-or-ddns>:51820
+AllowedIPs = 10.0.0.0/24, 10.138.26.0/24
+PersistentKeepalive = 25
+EOF
 ```
 
-Edit `/etc/openvpn/client/pivpn.conf` and fill in:
-- Your VPN server's IP/hostname on the `remote` line
-- Your CA certificate in `<ca>` block
-- Your client certificate in `<cert>` block
-- Your client private key in `<key>` block
-- Your TLS crypt key in `<tls-crypt>` block
+Key points:
+- **`AllowedIPs` defines split tunnelling.** Listing only the homelab and tunnel
+  subnets means internet traffic never enters the tunnel — so PIA and PiVPN can run
+  together, and `curl ifconfig.me` correctly shows your real IP with only PiVPN up.
+- **No `DNS =` line** — it conflicts with openresolv/systemd-resolved on Arch.
+- **`PersistentKeepalive = 25`** keeps NAT entries warm on remote networks.
+- Prefer a **DDNS hostname** over a bare IP for `Endpoint`. A residential IP will
+  change eventually and every failure it causes looks identical to a dead server.
 
-### 2b. Create the password file
+Ensure **UDP 51820** is forwarded on the home router to the PiVPN host.
+
+### 2b. Enable the systemd service
 
 ```bash
-sudo nano /etc/openvpn/client/pivpn.askpass
-# Enter your private key passphrase, save the file
-sudo chmod 600 /etc/openvpn/client/pivpn.askpass
+sudo systemctl enable wg-quick@pivpn     # do NOT --now; toggle from Waybar
 ```
 
-### 2c. Enable the systemd service
+> **Note:** The unit is named after the config file: `wg-quick@pivpn` corresponds to
+> `/etc/wireguard/pivpn.conf`. It is `Type=oneshot`, so it reports `active` as soon
+> as the interface exists — *even if the peer never answers*. That is why the status
+> script checks `rx_bytes` instead (see README, "Status indicators report real
+> liveness").
+
+### 2c. Set up polkit for passwordless control
 
 ```bash
-sudo systemctl enable openvpn-client@pivpn
-```
-
-> **Note:** The service is named after the config file: `openvpn-client@pivpn` corresponds to `/etc/openvpn/client/pivpn.conf`.
-
-### 2d. Set up polkit for passwordless control
-
-To allow your user to start/stop the VPN without a sudo prompt, create a polkit rule:
-
-```bash
-sudo tee /etc/polkit-1/rules.d/49-openvpn.rules << 'EOF'
+sudo tee /etc/polkit-1/rules.d/51-wireguard-pivpn.rules << 'EOF'
 polkit.addRule(function(action, subject) {
     if (action.id == "org.freedesktop.systemd1.manage-units" &&
-        action.lookup("unit") == "openvpn-client@pivpn.service" &&
+        action.lookup("unit") == "wg-quick@pivpn.service" &&
         subject.isInGroup("wheel")) {
         return polkit.Result.YES;
     }
 });
 EOF
+```
+
+### 2d. Verify
+
+```bash
+sudo wg show pivpn                              # look for "latest handshake"
+cat /sys/class/net/pivpn/statistics/rx_bytes    # >0 means the peer answered
 ```
 
 ---
@@ -79,7 +104,6 @@ EOF
 cp local-bin/omarchy-menu ~/.local/bin/omarchy-menu
 cp local-bin/pivpn-connect.sh ~/.local/bin/pivpn-connect.sh
 cp local-bin/pivpn-disconnect.sh ~/.local/bin/pivpn-disconnect.sh
-cp local-bin/pivpn-watchdog.sh ~/.local/bin/pivpn-watchdog.sh
 chmod +x ~/.local/bin/omarchy-menu
 chmod +x ~/.local/bin/pivpn-*.sh
 ```
@@ -140,19 +164,20 @@ omarchy-restart-waybar
 
 ---
 
-## 5. Root Crontab (PiVPN Watchdog)
+## 5. Root Crontab — no longer required
+
+The OpenVPN-era `pivpn-watchdog.sh` ran from root's crontab every minute to restart
+the service when `tun0` vanished. **It was removed in August 2026.** WireGuard has no
+session loop to get stuck in, and the script referenced `tun0` and
+`openvpn-client@pivpn` — neither of which exists any more — so it had been silently
+doing nothing since the migration.
+
+If you are upgrading an older install, remove the stale entry:
 
 ```bash
-sudo crontab -e
+sudo crontab -l                 # check whether the line is still there
+sudo crontab -e                 # delete the pivpn-watchdog.sh line
 ```
-
-Add the line from `crontab/root-crontab.example`:
-
-```
-* * * * * /home/YOUR_USERNAME/.local/bin/pivpn-watchdog.sh
-```
-
-Replace `YOUR_USERNAME` with your actual username.
 
 ---
 
@@ -209,7 +234,7 @@ After setup, your files will live at:
 | File | Location |
 |------|---------|
 | PiVPN connect/disconnect | `~/.local/bin/pivpn-{connect,disconnect}.sh` |
-| PiVPN watchdog | `~/.local/bin/pivpn-watchdog.sh` |
+| PiVPN notes (authoritative) | `~/.local/bin/PIVPN-NOTES.md` |
 | Custom menu shim | `~/.local/bin/omarchy-menu` |
 | Custom menu logic | `~/.config/omarchy/bin/omarchy-menu-nas.sh` |
 | NAS scripts | `~/.config/omarchy/bin/nas-{mount-smart,unmount-all}.sh` |
@@ -221,6 +246,6 @@ After setup, your files will live at:
 | Terminal MOTD | `~/.config/omarchy/bin/terminal-motd.sh` |
 | GParted fix | `~/.config/omarchy/bin/gparted-fixed.sh` |
 | Waybar VPN scripts | `~/.config/waybar/pia-*.sh`, `~/.config/waybar/pivpn-*.sh` |
-| OpenVPN config | `/etc/openvpn/client/pivpn.conf` |
-| OpenVPN password | `/etc/openvpn/client/pivpn.askpass` |
-| Root crontab | `sudo crontab -e` |
+| WireGuard config | `/etc/wireguard/pivpn.conf` |
+| WireGuard polkit rule | `/etc/polkit-1/rules.d/51-wireguard-pivpn.rules` |
+| Legacy OpenVPN config | `/etc/openvpn/client/pivpn.conf` (preserved, service disabled) |

@@ -1,46 +1,5 @@
 #!/usr/bin/env bash
-# Switch to "stock" hypridle configuration (normal timeouts).
-# Requires: ~/.config/hypr/hypridle-stock.conf to exist.
-# See SETUP.md for instructions on creating the stock/long configs.
-
-set -euo pipefail
-
-CFG_DIR="$HOME/.config/hypr"
-SRC="$CFG_DIR/hypridle-stock.conf"
-DST="$CFG_DIR/hypridle.conf"
-
-STATE_DIR="$HOME/.config/omarchy/state"
-MODE_FILE="$STATE_DIR/screensaver_mode"
-
-echo "=== Screensaver: STOCK mode ==="
-echo "[1/3] Source:      $SRC"
-echo "[1/3] Destination: $DST"
-echo
-
-if [[ ! -f "$SRC" ]]; then
-  echo "ERROR: missing $SRC"
-  command -v notify-send >/dev/null 2>&1 && notify-send "Screensaver" "Missing: hypridle-stock.conf" || true
-  exit 1
-fi
-
-cp -f "$SRC" "$DST"
-echo "[2/3] Copied stock config -> hypridle.conf"
-
-# Restart hypridle (systemd user if available, else manual)
-if systemctl --user list-unit-files 2>/dev/null | rg -q '^hypridle\.service'; then
-  systemctl --user restart hypridle.service
-  echo "[3/3] Restarted hypridle.service (user)"
-else
-  pkill -x hypridle 2>/dev/null || true
-  nohup hypridle -c "$DST" >/dev/null 2>&1 &
-  disown || true
-  echo "[3/3] Restarted hypridle (manual)"
-fi
-
-mkdir -p "$STATE_DIR"
-echo "stock" > "$MODE_FILE"
-
-command -v notify-send >/dev/null 2>&1 && notify-send "Screensaver" "Stock mode enabled ✅" || true
-echo
-read -n 1 -r -s -p "Press any key to close…"
-echo
+# Thin wrapper kept so the Omarchy menu and any keybinds keep working.
+# Real logic (and the Quattro shell.json migration note) lives in
+# screensaver-set-mode.sh
+exec "$HOME/.config/omarchy/bin/screensaver-set-mode.sh" stock "$@"

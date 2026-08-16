@@ -1,12 +1,4 @@
 #!/usr/bin/env bash
-# Smart terminal MOTD using fastfetch.
-# - Shows system info on new terminals
-# - Adapts logo display based on terminal width and window count on workspace
-# - Skips if stdout is not a TTY or MOTD was already shown this session
-#
-# Source from ~/.bashrc or ~/.zshrc:
-#   source ~/.config/omarchy/bin/terminal-motd.sh
-
 set -euo pipefail
 
 # If sourced, we can "return"; if executed, we must "exit".
@@ -61,7 +53,6 @@ alacritty_count="$(
   ' 2>/dev/null || echo 2
 )"
 
-# Show logo only on the first terminal in a workspace; compact on subsequent ones
 if [[ "${alacritty_count:-2}" -le 1 ]]; then
   fastfetch --logo small 2>/dev/null || true
 else
@@ -69,3 +60,4 @@ else
 fi
 
 _die 0
+

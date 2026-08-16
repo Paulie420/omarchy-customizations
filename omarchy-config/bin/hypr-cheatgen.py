@@ -1,29 +1,12 @@
 #!/usr/bin/env python3
-"""
-Hyprland keybind cheat sheet generator.
-
-Reads live bindings via `hyprctl binds -j` and outputs:
-  - ASCII table (for terminal display with `less`)
-  - Markdown table
-  - PDF (landscape, via python-reportlab)
-
-Usage:
-  hypr-cheatgen.py --format ascii --width 80 --out /path/to/output.txt
-  hypr-cheatgen.py --format md --out /path/to/output.md
-  hypr-cheatgen.py --format ascii --width 80 --out out.txt --pdf out.pdf --pdf-font-size 15
-
-Requirements:
-  - hyprctl (from Hyprland)
-  - python-reportlab (for PDF output): sudo pacman -S python-reportlab
-"""
-
 import argparse
 import json
 import subprocess
 import textwrap
 from collections import defaultdict
 
-# Hyprland modmask bits: 64=SUPER, 8=ALT, 4=CTRL, 1=SHIFT
+# Hyprland modmask bits (from your output):
+# 64=SUPER, 8=ALT, 4=CTRL, 1=SHIFT
 MOD_BITS = [
     (64, "SUPER"),
     (8,  "ALT"),
@@ -32,6 +15,7 @@ MOD_BITS = [
 ]
 
 # Optional: common X11 keycode mapping (works on typical US layouts)
+# If your hyprctl JSON includes "keycode", this makes numbers readable.
 X11_KEYCODE_MAP = {
     10: "1", 11: "2", 12: "3", 13: "4", 14: "5", 15: "6", 16: "7", 17: "8", 18: "9", 19: "0",
     24: "Q", 25: "W", 26: "E", 27: "R", 28: "T", 29: "Y", 30: "U", 31: "I", 32: "O", 33: "P",
@@ -39,15 +23,19 @@ X11_KEYCODE_MAP = {
     52: "Z", 53: "X", 54: "C", 55: "V", 56: "B", 57: "N", 58: "M",
     65: "SPACE", 36: "RETURN", 22: "BACKSPACE", 9: "ESCAPE", 23: "TAB",
     107: "PRINT", 119: "DELETE",
+    # Add more if you want
 }
-
 
 def run(cmd: list[str]) -> str:
     return subprocess.check_output(cmd, text=True)
 
-
 def decode_modmask(modmask) -> str:
-    """Decode a numeric modmask into a human-readable string like 'SUPER + SHIFT'."""
+    """
+    Hypr returns either:
+      - 'mod' as a string (sometimes)
+      - or 'modmask' as a number (what you're seeing)
+    We decode numeric modmasks into "SUPER + SHIFT + ..." style strings.
+    """
     try:
         m = int(modmask)
     except Exception:
@@ -56,13 +44,16 @@ def decode_modmask(modmask) -> str:
     names = [name for bit, name in MOD_BITS if (m & bit)]
     return " + ".join(names)
 
-
 def key_from_bind(b: dict) -> str:
-    """Extract a printable key name from a bind dict (handles multiple Hypr versions)."""
+    """
+    Hypr versions differ; try a few fields.
+    Prefer printable key names, fall back to keycode/code when needed.
+    """
     k = b.get("key")
     if k and str(k).strip():
         return str(k).strip()
 
+    # Some builds include keycode
     kc = b.get("keycode")
     if kc is not None:
         try:
@@ -71,18 +62,17 @@ def key_from_bind(b: dict) -> str:
         except Exception:
             pass
 
+    # Fallback: sometimes "code" exists
     code = b.get("code")
     if code is not None:
         return f"code:{code}"
 
-    return ""
-
+    return ""  # truly unknown
 
 def friendly_action(b: dict) -> str:
     disp = (b.get("dispatcher") or "").strip()
     arg  = (b.get("arg") or "").strip()
     return f"{disp} {arg}".strip()
-
 
 def combo_string(b: dict) -> str:
     mods = b.get("mod")
@@ -97,9 +87,12 @@ def combo_string(b: dict) -> str:
         return mods_s
     return key
 
-
 def to_ascii_sections(binds: list[dict], width: int = 80) -> str:
-    """Produce an aligned ASCII cheat sheet with fixed-width key column."""
+    """
+    Produce a strict, aligned, <=width ASCII cheat sheet:
+      [SECTION]
+      KEYS... (fixed column) | ACTION... (wrapped)
+    """
     groups = defaultdict(list)
     for b in binds:
         disp = (b.get("dispatcher") or "unknown").strip()
@@ -110,6 +103,9 @@ def to_ascii_sections(binds: list[dict], width: int = 80) -> str:
         out.append(f"[{disp.upper()}]")
         rows = sorted(groups[disp], key=lambda x: (x[0], x[1]))
 
+        # Tuned for 80 columns:
+        # - key_w: fixed width for the keys column
+        # - act_w: remaining width for action wrapping
         key_w = 26
         act_w = max(10, width - (key_w + 3))  # " | "
 
@@ -131,7 +127,6 @@ def to_ascii_sections(binds: list[dict], width: int = 80) -> str:
 
     return "\n".join(out).rstrip() + "\n"
 
-
 def to_markdown(binds: list[dict]) -> str:
     groups = defaultdict(list)
     for b in binds:
@@ -148,9 +143,11 @@ def to_markdown(binds: list[dict]) -> str:
         md.append("")
     return "\n".join(md)
 
-
 def write_pdf_ascii(content: str, pdf_path: str, *, font_size: int = 10, line_h: int = 11):
-    """Render ASCII content to a landscape PDF using ReportLab."""
+    """
+    Render ASCII content to a landscape PDF without LaTeX (ReportLab).
+    Larger font looks nicer, but may push content onto more pages. That's OK.
+    """
     try:
         import reportlab  # noqa: F401
     except ModuleNotFoundError:
@@ -162,21 +159,25 @@ def write_pdf_ascii(content: str, pdf_path: str, *, font_size: int = 10, line_h:
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
 
+    # Monospace font for perfect alignment
     font = "Courier"
     try:
         pdfmetrics.registerFont(TTFont("DejaVuMono", "/usr/share/fonts/TTF/DejaVuSansMono.ttf"))
         font = "DejaVuMono"
     except Exception:
-        pass  # Courier fallback is fine
+        # Courier fallback is fine
+        pass
 
     pagesize = landscape(letter)
     c = canvas.Canvas(pdf_path, pagesize=pagesize)
     w, h = pagesize
 
     left = 0.5 * inch
+    right = 0.5 * inch
     top = h - 0.5 * inch
     bottom = 0.5 * inch
 
+    # If you want even larger text, bump font_size to 11 and line_h to 12.
     c.setFont(font, font_size)
 
     y = top
@@ -185,20 +186,20 @@ def write_pdf_ascii(content: str, pdf_path: str, *, font_size: int = 10, line_h:
             c.showPage()
             c.setFont(font, font_size)
             y = top
+        # Avoid drawing outside page width (ReportLab won't wrap automatically)
         c.drawString(left, y, line)
         y -= line_h
 
     c.save()
 
-
 def main():
-    ap = argparse.ArgumentParser(description="Generate a Hyprland keybind cheat sheet.")
+    ap = argparse.ArgumentParser()
     ap.add_argument("--format", choices=["ascii", "md"], default="ascii")
     ap.add_argument("--width", type=int, default=80)
     ap.add_argument("--out", default=None, help="Write to a file instead of stdout")
-    ap.add_argument("--pdf", default=None, help="Also generate a PDF (ASCII only; requires reportlab)")
-    ap.add_argument("--pdf-font-size", type=int, default=10)
-    ap.add_argument("--pdf-line-height", type=int, default=11)
+    ap.add_argument("--pdf", default=None, help="Also generate a PDF to this path (ASCII only; uses reportlab)")
+    ap.add_argument("--pdf-font-size", type=int, default=10, help="PDF font size (default 10)")
+    ap.add_argument("--pdf-line-height", type=int, default=11, help="PDF line height (default 11)")
     args = ap.parse_args()
 
     binds = json.loads(run(["hyprctl", "binds", "-j"]))
@@ -214,9 +215,10 @@ def main():
     else:
         print(content, end="")
 
+    # Optional PDF generation (best with ASCII output)
     if args.pdf:
         if args.format != "ascii":
-            raise SystemExit("--pdf is intended for --format ascii.")
+            raise SystemExit("--pdf is intended for --format ascii (so alignment stays perfect).")
         write_pdf_ascii(
             content,
             args.pdf,
@@ -224,6 +226,6 @@ def main():
             line_h=args.pdf_line_height,
         )
 
-
 if __name__ == "__main__":
     main()
+

@@ -1,8 +1,4 @@
 #!/bin/bash
-# Generate and display the Hyprland keybind cheat sheet in a terminal.
-# Requires: hypr-cheatgen.py, alacritty, less
-# Pass --all to also generate Markdown + PDF versions.
-
 set -euo pipefail
 
 # Ensure Hypr can find your stuff even if it doesn't inherit your shell PATH
@@ -14,17 +10,21 @@ MD="$CHEAT_DIR/hypr-binds.md"
 PDF="$CHEAT_DIR/hypr-binds.pdf"
 
 CHEATGEN="$HOME/.config/omarchy/bin/hypr-cheatgen.py"
-TERM_BIN="/usr/bin/alacritty"
+# Launch through the user's default terminal (foot/ghostty/kitty/alacritty)
+# instead of hardcoding one. The app-id gives Hyprland a stable handle for
+# the float+center window rule in ~/.config/hypr/looknfeel.lua.
+APP_ID="org.omarchy.custom-tui"
 
 mkdir -p "$CHEAT_DIR"
 
+# sanity checks with visible feedback
 if [[ ! -x "$CHEATGEN" ]]; then
   notify-send "Cheat sheet" "hypr-cheatgen.py not executable: $CHEATGEN"
   exit 1
 fi
 
-if [[ ! -x "$TERM_BIN" ]]; then
-  notify-send "Cheat sheet" "Alacritty not found at $TERM_BIN"
+if ! command -v omarchy-launch-tui >/dev/null 2>&1; then
+  notify-send "Cheat sheet" "omarchy-launch-tui not found on PATH"
   exit 1
 fi
 
@@ -38,5 +38,7 @@ if [[ "${1:-}" == "--all" ]]; then
     --pdf "$PDF" --pdf-font-size 15 --pdf-line-height 17
 fi
 
-# Open in terminal with less (no wrap, keeps alignment)
-exec "$TERM_BIN" --class CheatSheet -e bash -lc "less -SR '$TXT'"
+# Open in terminal with less (no wrap, keep alignment)
+#exec "$TERM_BIN" --title "Hypr Cheat Sheet" -e bash -lc "less -SR '$TXT'"
+exec omarchy-launch-tui --app-id="$APP_ID" bash -lc "printf \"\033]0;Omarchy · Keybind Cheatsheet\007\"; less -SR '$TXT'"
+

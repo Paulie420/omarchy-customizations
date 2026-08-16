@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
-# Status dashboard: shows VPN state, NAS reachability, mount status,
-# sound theme, and screensaver mode.
-# Edit NAS_IP and MOUNTS to match your configuration.
-
 set -euo pipefail
 
-PIACTL="/opt/piavpn/bin/piactl"
-PIVPN_SERVICE="openvpn-client@pivpn"
+# omarchy-window-title -- name the terminal window so these popups are identifiable
+printf '\033]0;Omarchy \u00b7 VPN & NAS Status\007'
 
-# ── CONFIGURE THESE ──────────────────────────────────────────────────────────
-NAS_IP="YOUR_NAS_IP"               # e.g., 192.168.1.100
+PIACTL="/opt/piavpn/bin/piactl"
+PIVPN_SERVICE="wg-quick@pivpn"
+NAS_IP="10.0.0.118"
+
 MOUNTS=(
-  "/mnt/Share1"
-  "/mnt/Share2"
-  "/mnt/Share3"
+  "/mnt/Backup4TB"
+  "/mnt/Backup6TB"
+  "/mnt/Beers4TB"
+  "/mnt/newBackupXTB"
 )
-# ─────────────────────────────────────────────────────────────────────────────
 
 SOUND_DIR="$HOME/.config/omarchy/sounds"
 STATE_DIR="$HOME/.config/omarchy/state"
@@ -65,50 +63,67 @@ screensaver_mode() {
   fi
 }
 
-echo "=== CUSTOMIZATION STATUS ==="
-echo
+bold=$'\033[1m'; dim=$'\033[2m'; rst=$'\033[0m'
 
-echo "Sounds:"
-echo "  Theme: $(current_sound)"
-echo "  Startup Sound:  $([[ -f "$STARTUP_MP3" ]] && echo "present ✅" || echo "missing ❌")"
-echo "  Shutdown Sound: $([[ -f "$SHUTDOWN_MP3" ]] && echo "present ✅" || echo "missing ❌")"
-echo
+rule() { printf '%s  %s%s\n' "$dim" "──────────────────────────────────────────────────────────" "$rst"; }
 
-echo "Screensaver:"
-echo "  Mode: $(screensaver_mode)"
-echo
+printf '\n  %sOMARCHY%s  %s·%s  %sCUSTOMIZATION STATUS%s\n' \
+  "$bold" "$rst" "$dim" "$rst" "$bold" "$rst"
+rule
+printf '\n'
 
+# ---- desktop --------------------------------------------------------------
+printf '  %sDESKTOP%s\n' "$bold" "$rst"
+printf '    %-14s %-20s %s\n' "Sounds" "$(current_sound)" \
+  "startup $([[ -f "$STARTUP_MP3" ]] && echo ✅ || echo ❌)   shutdown $([[ -f "$SHUTDOWN_MP3" ]] && echo ✅ || echo ❌)"
 
-echo "PIA:"
+idle_info=""
+if [[ -r "$HOME/.config/omarchy/shell.json" ]]; then
+  idle_info="$(python3 -c "
+import json
+d=json.load(open('$HOME/.config/omarchy/shell.json')).get('idle',{})
+s=d.get('screensaver',0)//60; l=d.get('lock',0)//60
+print(f'screensaver {s} min  ·  lock {l} min')" 2>/dev/null || true)"
+fi
+printf '    %-14s %-20s %s\n' "Screensaver" "$(screensaver_mode)" "$idle_info"
+printf '\n'
+
+# ---- vpn ------------------------------------------------------------------
+printf '  %sVPN%s\n' "$bold" "$rst"
 if [[ -x "$PIACTL" ]]; then
-  "$PIACTL" get connectionstate 2>/dev/null || true
+  printf '    %-14s %s\n' "PIA" "$("$PIACTL" get connectionstate 2>/dev/null || echo unknown)"
 else
-  echo "piactl not found at $PIACTL"
+  printf '    %-14s %s\n' "PIA" "piactl not installed"
 fi
-echo
 
-echo "PiVPN ($PIVPN_SERVICE):"
-systemctl is-active --quiet "$PIVPN_SERVICE" && echo "active ✅" || echo "inactive ❌"
-echo
-
-echo "NAS reachability ($NAS_IP):"
-if ping -c 1 -W 1 "$NAS_IP" >/dev/null 2>&1; then
-  echo "reachable ✅"
+if systemctl is-active --quiet "$PIVPN_SERVICE"; then
+  rx="$(cat /sys/class/net/pivpn/statistics/rx_bytes 2>/dev/null || echo 0)"
+  if [[ "$rx" -gt 0 ]]; then
+    printf '    %-14s %-20s %s\n' "PiVPN" "Connected ✅" \
+      "$(numfmt --to=iec --suffix=B "$rx" 2>/dev/null || echo "$rx B") received"
+  else
+    printf '    %-14s %s\n' "PiVPN" "NO HANDSHAKE ❌   interface up, peer never answered"
+  fi
 else
-  echo "not reachable ❌"
+  printf '    %-14s %s\n' "PiVPN" "Disconnected"
 fi
-echo
+printf '\n'
 
-echo "Mountpoints (from /proc/self/mountinfo — safe even if NFS is dead):"
+# ---- nas ------------------------------------------------------------------
+printf '  %sNAS%s  %s·%s  %s  %s\n' "$bold" "$rst" "$dim" "$rst" "$NAS_IP" \
+  "$(ping -c1 -W1 "$NAS_IP" >/dev/null 2>&1 && echo 'reachable ✅' || echo 'unreachable ❌')"
+printf '\n'
 for m in "${MOUNTS[@]}"; do
   if is_mounted_mountinfo "$m"; then
     src="$(mounted_source_mountinfo "$m" || true)"
-    [[ -n "$src" ]] && echo "✅ $m   ($src)" || echo "✅ $m"
+    printf '    ✅  %-22s %s%s%s\n' "$m" "$dim" "${src#*:}" "$rst"
   else
-    echo "❌ $m"
+    printf '    ❌  %-22s %snot mounted%s\n' "$m" "$dim" "$rst"
   fi
 done
 
-echo
-read -n 1 -r -s -p "Press any key to close…"
-echo
+printf '\n'
+rule
+printf '\n'
+[[ -t 0 ]] && read -n 1 -r -s -p "  Press any key to close…"
+printf '\n'

@@ -1,45 +1,43 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SERVICE="openvpn-client@pivpn"
-PIACTL="/opt/piavpn/bin/piactl"
-STATE_FILE="/tmp/pivpn-pia-was-connected"
+# omarchy-window-title -- name the terminal window so these popups are identifiable
+printf '\033]0;Omarchy \u00b7 PiVPN Connect\007'
 
-log() {
-  # Only print if stdout is a terminal
-  if [[ -t 1 ]]; then
-    echo "$@"
-  fi
-}
+INTERFACE="pivpn"
+STATE_FILE="/tmp/pivpn-pia-was-active"
 
-log "[PiVPN] Connecting…"
+log() { if [[ -t 1 ]]; then echo "$@"; fi }
 
-# 1) Handle PIA state: if PIA is running, disconnect it first and save that we did so
-if [[ -x "$PIACTL" ]]; then
-  state="$("$PIACTL" get connectionstate 2>/dev/null || true)"
-  if [[ "$state" == "Connected" || "$state" == "Connecting" ]]; then
-    log "[PiVPN] PIA is $state – disconnecting it first…"
-    echo "1" > "$STATE_FILE"
-    "$PIACTL" disconnect || true
-    sleep 2
-  else
-    rm -f "$STATE_FILE"
-  fi
+if systemctl is-active --quiet "wg-quick@${INTERFACE}.service"; then
+    log "[PiVPN] Already connected."
+    exit 0
+fi
+
+# Disconnect PIA if active — two VPNs routing simultaneously is unreliable
+PIA_STATE=$(piactl get connectionstate 2>/dev/null || echo "Disconnected")
+if [[ "$PIA_STATE" != "Disconnected" ]]; then
+    log "[PiVPN] PIA is active ($PIA_STATE) — disconnecting PIA first..."
+    echo "true" > "$STATE_FILE"
+    piactl disconnect
+    # Wait up to 10s for PIA to fully disconnect
+    for i in {1..10}; do
+        sleep 1
+        PIA_NOW=$(piactl get connectionstate 2>/dev/null || echo "Disconnected")
+        [[ "$PIA_NOW" == "Disconnected" ]] && break
+    done
 else
-  rm -f "$STATE_FILE"
+    echo "false" > "$STATE_FILE"
 fi
 
-# 2) If PiVPN already active, bail
-if systemctl is-active --quiet "$SERVICE"; then
-  log "[PiVPN] $SERVICE is already active."
-  exit 0
+log "[PiVPN] Connecting..."
+if ! systemctl start "wg-quick@${INTERFACE}.service"; then
+    log "[PiVPN] ERROR: failed to start wg-quick@${INTERFACE}."
+    # Restore PIA if we turned it off
+    if [[ "$(cat "$STATE_FILE" 2>/dev/null)" == "true" ]]; then
+        log "[PiVPN] Restoring PIA..."
+        piactl connect || true
+    fi
+    exit 1
 fi
-
-# 3) Start via systemd (polkit will handle auth if needed)
-log "[PiVPN] Starting $SERVICE via systemd…"
-if ! systemctl start "$SERVICE"; then
-  log "[PiVPN] ERROR: failed to start $SERVICE."
-  exit 1
-fi
-
-log "[PiVPN] Started."
+log "[PiVPN] Connected."

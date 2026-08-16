@@ -1,21 +1,14 @@
 #!/usr/bin/env bash
-# Play a shutdown/reboot sound before executing a system power action.
-# Usage:
-#   action-with-shutdown-sound.sh shutdown
-#   action-with-shutdown-sound.sh reboot
-#   action-with-shutdown-sound.sh halt
-#   action-with-shutdown-sound.sh -- <any-command>
-
 set -euo pipefail
 
 SOUND_DIR="$HOME/.config/omarchy/sounds"
 STATE_DIR="$HOME/.config/omarchy/state"
 CURRENT_FILE="$STATE_DIR/current_sound"
 
-# Active sound (set by change-startup-shutdown-sounds.sh)
+# Preferred "active" sound (selected by our menu)
 SOUND_SHUTDOWN="$SOUND_DIR/shutdown.mp3"
 
-# Fallback if user hasn't selected a theme yet
+# Fallback (if user hasn't selected anything yet)
 FALLBACK_SHUTDOWN="$SOUND_DIR/winxpshutdown.mp3"
 
 ensure_defaults() {
@@ -34,7 +27,7 @@ ensure_defaults() {
 play_sound() {
   local f="$1"
 
-  # Blocking play (important — must finish before system shuts down)
+  # blocking play (important)
   if command -v mpv >/dev/null 2>&1; then
     mpv --no-video --really-quiet --keep-open=no "$f" >/dev/null 2>&1 || true
   elif command -v ffplay >/dev/null 2>&1; then
@@ -48,6 +41,7 @@ play_sound() {
 
 ensure_defaults
 
+# Use shutdown.mp3 if present; else fallback; else do nothing
 SOUND_TO_PLAY=""
 if [[ -f "$SOUND_SHUTDOWN" ]]; then
   SOUND_TO_PLAY="$SOUND_SHUTDOWN"
@@ -78,3 +72,4 @@ case "${1-}" in
     exit 2
     ;;
 esac
+
