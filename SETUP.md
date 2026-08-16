@@ -7,7 +7,7 @@ Step-by-step instructions for installing these customizations on a fresh Omarchy
 ## 1. Install Prerequisites
 
 ```bash
-sudo pacman -S wireguard-tools nfs-utils jq rofi mpv python-reportlab fastfetch zathura libnotify
+sudo pacman -S wireguard-tools nfs-utils jq mpv python-reportlab fastfetch zathura libnotify
 ```
 
 Install PIA via the AUR (provides `piactl` at `/opt/piavpn/bin/piactl`):
@@ -64,7 +64,7 @@ Ensure **UDP 51820** is forwarded on the home router to the PiVPN host.
 ### 2b. Enable the systemd service
 
 ```bash
-sudo systemctl enable wg-quick@pivpn     # do NOT --now; toggle from Waybar
+sudo systemctl enable wg-quick@pivpn     # do NOT --now; toggle from the bar widget
 ```
 
 > **Note:** The unit is named after the config file: `wg-quick@pivpn` corresponds to
@@ -101,10 +101,8 @@ cat /sys/class/net/pivpn/statistics/rx_bytes    # >0 means the peer answered
 ### 3a. Local bin scripts
 
 ```bash
-cp local-bin/omarchy-menu ~/.local/bin/omarchy-menu
 cp local-bin/pivpn-connect.sh ~/.local/bin/pivpn-connect.sh
 cp local-bin/pivpn-disconnect.sh ~/.local/bin/pivpn-disconnect.sh
-chmod +x ~/.local/bin/omarchy-menu
 chmod +x ~/.local/bin/pivpn-*.sh
 ```
 
@@ -135,32 +133,40 @@ Do the same in `~/.config/omarchy/bin/vpn-nas-status.sh` and `~/.config/omarchy/
 
 ---
 
-## 4. Waybar
+## 4. Bar widget and custom menu
 
-### 4a. Install scripts
+Waybar is gone in Quattro. The VPN indicators are a published Quickshell plugin,
+and the Custom menu is a supported extension file.
 
-```bash
-cp waybar/pia-*.sh ~/.config/waybar/
-cp waybar/pivpn-*.sh ~/.config/waybar/
-chmod +x ~/.config/waybar/*.sh
-```
-
-### 4b. Update your waybar config
-
-Add the VPN modules to your `~/.config/waybar/config.jsonc`. See `waybar/config.jsonc` for the full example, or merge just the relevant sections:
-
-- Add `"custom/pia"` and `"custom/pivpn"` to your `modules-right` array
-- Add the module definitions from the `custom/pia` and `custom/pivpn` sections
-
-### 4c. Update your waybar style
-
-Merge the VPN-related CSS from `waybar/style.css` into your `~/.config/waybar/style.css`.
-
-### 4d. Restart waybar
+### 4a. Install the VPN plugin
 
 ```bash
-omarchy-restart-waybar
+omarchy plugin add https://github.com/Paulie420/omarchy-vpn.git --enable
+omarchy bar move paulie420.vpn --section right
 ```
+
+Then configure it in `~/.config/omarchy/shell.json`. This machine points the
+connect/disconnect commands at the wrapper scripts so the PIA interlock runs:
+
+```jsonc
+{ "id": "paulie420.vpn",
+  "pia": { "enabled": true, "label": "PIA" },
+  "wireguard": [{ "label": "PiVPN", "interface": "pivpn",
+    "connectCommand": "$HOME/.local/bin/pivpn-connect.sh",
+    "disconnectCommand": "$HOME/.local/bin/pivpn-disconnect.sh",
+    "reachabilityHost": "10.0.0.118" }] }
+```
+
+A reference copy of the whole file is in `omarchy-config/shell.json`.
+
+### 4b. Install the Custom menu
+
+```bash
+mkdir -p ~/.config/omarchy/extensions
+cp omarchy-config/extensions/omarchy-menu.jsonc ~/.config/omarchy/extensions/
+```
+
+It hot-reloads on save. No restart needed.
 
 ---
 
@@ -185,9 +191,9 @@ sudo crontab -e                 # delete the pivpn-watchdog.sh line
 
 If you want a startup sound on login, add this to your Hyprland autostart:
 
-```bash
-# In ~/.config/hypr/autostart.conf:
-exec-once = ~/.config/omarchy/bin/hypr-startup-sound.sh
+```lua
+-- In ~/.config/hypr/autostart.lua:
+o.launch_on_start(os.getenv("HOME") .. "/.config/omarchy/bin/hypr-startup-sound.sh")
 ```
 
 Copy the included sound files to `~/.config/omarchy/sounds/`:
@@ -212,18 +218,19 @@ source ~/.config/omarchy/bin/terminal-motd.sh
 
 ---
 
-## 8. Screensaver Configs (Optional)
+## 8. Screensaver modes (Optional)
 
-The screensaver mode scripts swap between two hypridle configs. Create them:
+Quattro retired hypridle. Idle and lock are now `idle.screensaver` and
+`idle.lock` (seconds) in `~/.config/omarchy/shell.json`, and
+`screensaver-set-mode.sh` writes them:
 
 ```bash
-# Copy your current hypridle.conf as the "stock" version
-cp ~/.config/hypr/hypridle.conf ~/.config/hypr/hypridle-stock.conf
-
-# Create a "long" version with extended timeouts
-cp ~/.config/hypr/hypridle.conf ~/.config/hypr/hypridle-long.conf
-# Then edit hypridle-long.conf to increase the timeout values
+~/.config/omarchy/bin/screensaver-stock-mode.sh   # 150s screensaver / 300s lock
+~/.config/omarchy/bin/screensaver-long-mode.sh    # 600s / 900s
 ```
+
+Edit the two profiles inside `screensaver-set-mode.sh` to taste. shell.json
+hot-reloads, so nothing needs restarting.
 
 ---
 
@@ -235,8 +242,10 @@ After setup, your files will live at:
 |------|---------|
 | PiVPN connect/disconnect | `~/.local/bin/pivpn-{connect,disconnect}.sh` |
 | PiVPN notes (authoritative) | `~/.local/bin/PIVPN-NOTES.md` |
-| Custom menu shim | `~/.local/bin/omarchy-menu` |
-| Custom menu logic | `~/.config/omarchy/bin/omarchy-menu-nas.sh` |
+| Custom menu | `~/.config/omarchy/extensions/omarchy-menu.jsonc` |
+| Bar layout + widget config | `~/.config/omarchy/shell.json` |
+| VPN bar widget | `~/.config/omarchy/plugins/paulie420.vpn/` |
+| Hyprland config | `~/.config/hypr/*.lua` |
 | NAS scripts | `~/.config/omarchy/bin/nas-{mount-smart,unmount-all}.sh` |
 | Sound scripts | `~/.config/omarchy/bin/{hypr-startup-sound,action-with-shutdown-sound,change-startup-shutdown-sounds}.sh` |
 | Screensaver scripts | `~/.config/omarchy/bin/screensaver-{stock,long}-mode.sh` |
@@ -245,7 +254,7 @@ After setup, your files will live at:
 | Status dashboard | `~/.config/omarchy/bin/vpn-nas-status.sh` |
 | Terminal MOTD | `~/.config/omarchy/bin/terminal-motd.sh` |
 | GParted fix | `~/.config/omarchy/bin/gparted-fixed.sh` |
-| Waybar VPN scripts | `~/.config/waybar/pia-*.sh`, `~/.config/waybar/pivpn-*.sh` |
+| Sound files | `~/.config/omarchy/sounds/` |
 | WireGuard config | `/etc/wireguard/pivpn.conf` |
 | WireGuard polkit rule | `/etc/polkit-1/rules.d/51-wireguard-pivpn.rules` |
 | Legacy OpenVPN config | `/etc/openvpn/client/pivpn.conf` (preserved, service disabled) |
